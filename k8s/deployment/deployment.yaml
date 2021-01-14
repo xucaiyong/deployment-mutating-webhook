@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy-mutate-webhook
+  labels:
+    app: deploy-mutate-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deploy-mutate-webhook
+  template:
+    metadata:
+      labels:
+        app: deploy-mutate-webhook
+    spec:
+      containers:
+      - name: deploy-mutate-webhook
+#        image: CONTAINER_IMAGE
+        image: webhook-deploy-test:v0.1
+#        image: quay.io/didil/hello-webhook:0.1.9
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - name: deploy-mutate-tls-secret
+          mountPath: "/tls"
+          readOnly: true        
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"           
+      volumes:
+      - name: deploy-mutate-tls-secret
+        secret:
+          secretName: deploy-mutate-tls-secret

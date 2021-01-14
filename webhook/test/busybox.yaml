@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-1
+  namespace: default
+spec:
+  containers:
+  - args:
+    - sleep
+    - "3600"
+    image: busybox
+    imagePullPolicy: IfNotPresent
+    name: busybox-1
+    env:
+      - name: MY_POD_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace

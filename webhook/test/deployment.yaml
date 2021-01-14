@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-webhook-deployment
+  labels:
+    app: hello-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-webhook
+  template:
+    metadata:
+      labels:
+        app: hello-webhook
+    spec:
+      containers:
+      - name: hello-webhook
+#        image: CONTAINER_IMAGE
+        image: webhook-deploy-test:v0.5
+#        image: quay.io/didil/hello-webhook:0.1.9
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - name: hello-tls-secret
+          mountPath: "/tls"
+          readOnly: true        
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"           
+      volumes:
+      - name: hello-tls-secret
+        secret:
+          secretName: hello-tls-secret

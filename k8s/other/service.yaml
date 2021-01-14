@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: deploy-mutate-webhook
+spec:
+  type: ClusterIP
+  selector:
+    app: deploy-mutate-webhook
+  ports:
+  - protocol: TCP
+    port: 443
+    targetPort: 8000
