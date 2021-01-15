@@ -32,7 +32,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//add the lifecycle to the deployment
-    cmd := []string{"sleep","30"}
+	cmd := []string{"sleep", "30"}
 	deployPodSpec := deploy.Spec.Template.Spec
 	podPreStop := &corev1.Lifecycle{
 		PreStop: &corev1.Handler{
@@ -50,7 +50,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 					Exec: &corev1.ExecAction{Command: cmd}},
 			}
 		}
-		if 	preStop == nil {
+		if preStop == nil {
 			deployPodSpec.Containers[0].Lifecycle = podPreStop
 		}
 	}
@@ -75,23 +75,39 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 	//add the podAntiAffinity to the deployment
 
 	//antiAffinity := deployPodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-	//var labelSelector []metav1.LabelSelectorRequirement
-	////test := corev1.WeightedPodAffinityTerm{Weight: 100,PodAffinityTerm: corev1.PodAffinityTerm{LabelSelector: metav1.LabelSelector{MatchExpressions: metav1.LabelSelectorRequirement}}}
-	//for k,v := range deploy.Spec.Selector.MatchLabels {
-	//	m :=[]string{v}
-	//	labelSelector = append(labelSelector, metav1.LabelSelectorRequirement{k,"in",m})
-	//	antiAffinity = append(antiAffinity, corev1.WeightedPodAffinityTerm{
-	//		Weight: 100,PodAffinityTerm: corev1.PodAffinityTerm{
-	//			LabelSelector: &metav1.LabelSelector{
-	//				MatchExpressions: labelSelector}}})
-	//}
-	//deployPodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = antiAffinity
-	//antiAffinityByte, err := json.Marshal(&deployPodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
-	//if err != nil {
-	//	app.HandleError(w, r, fmt.Errorf("marshall deploy DNSPolicy: %v", err))
-	//	return
-	//}
-
+	var labelSelector []metav1.LabelSelectorRequirement
+	var antiAffinity []corev1.WeightedPodAffinityTerm
+	//test := corev1.WeightedPodAffinityTerm{Weight: 100,PodAffinityTerm: corev1.PodAffinityTerm{LabelSelector: metav1.LabelSelector{MatchExpressions: metav1.LabelSelectorRequirement}}}
+	for k, v := range deploy.Spec.Selector.MatchLabels {
+		m := []string{v}
+		labelSelector = append(labelSelector, metav1.LabelSelectorRequirement{k, "In", m})
+	}
+	antiAffinity = append(antiAffinity, corev1.WeightedPodAffinityTerm{
+		Weight: 100, PodAffinityTerm: corev1.PodAffinityTerm{
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: labelSelector}, TopologyKey: "kubernetes.io/hostname"}})
+	if deployPodSpec.Affinity == nil {
+		deployPodSpec.Affinity = &corev1.Affinity{
+			PodAntiAffinity: &corev1.PodAntiAffinity{PreferredDuringSchedulingIgnoredDuringExecution: antiAffinity},
+		}
+	} else {
+		if deployPodSpec.Affinity.PodAntiAffinity == nil {
+			deployPodSpec.Affinity.PodAntiAffinity = &corev1.PodAntiAffinity{PreferredDuringSchedulingIgnoredDuringExecution: antiAffinity}
+		} else {
+			if deployPodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution == nil {
+				deployPodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = antiAffinity
+			} else {
+				for i:=0;i<len(antiAffinity);i++ {
+					deployPodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(deployPodSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, antiAffinity[i])
+				}
+			}
+		}
+	}
+	antiAffinityByte, err := json.Marshal(&deployPodSpec.Affinity)
+	if err != nil {
+		app.HandleError(w, r, fmt.Errorf("marshall deploy DNSPolicy: %v", err))
+		return
+	}
 
 	//add the DNSConfig to the deployment
 	m := "2"
@@ -226,11 +242,11 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			Path:  "/spec/template/spec/containers",
 			Value: LifecycleBytes,
 		},
-		//JSONPatchEntry{
-		//	OP:    "replace",
-		//	Path:  "/spec/template/spec/affinity",
-		//	Value: antiAffinityByte,
-		//},
+		JSONPatchEntry{
+			OP:    "replace",
+			Path:  "/spec/template/spec/affinity",
+			Value: antiAffinityByte,
+		},
 	}
 
 	patchBytes, err := json.Marshal(&patch)
